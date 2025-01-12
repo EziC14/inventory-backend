@@ -1,0 +1,43 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Run Django",
+            "type": "shell",
+            "command": "conda activate venvBackendINVE && python manage.py makemigrations && python manage.py migrate && python manage.py runserver",
+            "runOptions": {
+                "runOn": "folderOpen"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Build and Push Docker Image",
+            "type": "shell",
+            "command": "${workspaceFolder}/build_and_push.bat",
+            "args": [
+                "${input:dockerTag}"
+            ],
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            }
+        }
+    ],
+    "inputs": [
+        {
+            "id": "dockerTag",
+            "type": "promptString",
+            "description": "Introduce el tag para la imagen Docker",
+            "default": "0.0.0"
+        }
+    ]
+}

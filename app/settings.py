@@ -10,7 +10,11 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
+from decouple import config, Csv
+import os
 from pathlib import Path
+import datetime
+from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,23 +24,29 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-m(o*#^53e3g$9m+b-w5g4n+1!6w8aeq7_ecg1k_n=fmf2(4fuh'
+SECRET_KEY = config('SECRET_KEY') 
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG', cast=bool)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv())
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', cast=Csv())
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'corsheaders',
+    'security',
+    'product',
+    'crequest',
 ]
 
 MIDDLEWARE = [
@@ -47,6 +57,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
 ]
 
 ROOT_URLCONF = 'app.urls'
@@ -75,8 +87,12 @@ WSGI_APPLICATION = 'app.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE'   : 'django.db.backends.postgresql',
+        'NAME'     : config('DB_NAME'),
+        'USER'     : config('DB_USER'),
+        'PASSWORD' : config('DB_PASSWORD'),
+        'HOST'     : config('DB_HOST', default='localhost'),
+        'PORT'     : config('DB_PORT', default=5432, cast=int),
     }
 }
 
@@ -103,13 +119,21 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'es-ES'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Lima'
 
 USE_I18N = True
 
 USE_TZ = True
+
+USE_THOUSAND_SEPARATOR = True
+
+THOUSAND_SEPARATOR = ','
+
+NUMBER_GROUPING = 3
+
+DECIMAL_SEPARATOR = '.'
 
 
 # Static files (CSS, JavaScript, Images)
@@ -121,3 +145,123 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# MEDIA FILES
+MEDIA_DIRNAME = 'media'
+if not os.path.exists(os.path.join(BASE_DIR,  MEDIA_DIRNAME)):
+    os.makedirs(os.path.join(BASE_DIR,  MEDIA_DIRNAME))
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_URL = '/media/'
+
+###################################
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=7),  # Cambia el tiempo de sesión del token de acceso según tus necesidades.
+    'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=2),  # Cambia el tiempo de vida del token de actualización según tus necesidades.
+    'SLIDING_TOKEN_LIFETIME': timedelta(days=30),  # Tiempo máximo de vida del token de actualización.
+    'SLIDING_TOKEN_REFRESH_GRACE_PERIOD': timedelta(days=4),  # Período de gracia para actualizar el token antes de que expire.
+    'ALGORITHM': 'HS256',  # Algoritmo de encriptación, puedes cambiarlo según tus necesidades.
+    'SIGNING_KEY': SECRET_KEY,  # Clave secreta de tu aplicación.
+    'VERIFYING_KEY': None,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+}
+###################################
+
+REST_FRAMEWORK = {
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+        # 'rest_framework.permissions.AllowAny',
+    ),
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        # 'rest_framework.authentication.BasicAuthentication',
+        # 'rest_framework.authentication.TokenAuthentication',
+        # 'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication', 
+    ),
+}
+
+JWT_AUTH = {
+    # how long the original token is valid for
+    'JWT_EXPIRATION_DELTA': datetime.timedelta(days=7 if DEBUG else 1),
+    # 'JWT_EXPIRATION_DELTA': datetime.timedelta(seconds=60 if DEBUG else 1),
+
+    # allow refreshing of tokens
+    'JWT_ALLOW_REFRESH': True,
+
+    # this is the maximum time AFTER the token was issued that
+    # it can be refreshed.  exprired tokens can't be refreshed.
+    'JWT_REFRESH_EXPIRATION_DELTA': datetime.timedelta(days=7),
+
+    'JWT_RESPONSE_PAYLOAD_HANDLER': 'aios.views.jwt_response_payload_handler'
+}
+
+CONTENT_TYPE = 'application/json; charset=utf-8'
+FILE_UPLOAD_PERMISSIONS=0o644
+
+CORS_ALLOWED_ORIGINS = [
+    # Aquí puedes agregar los dominios permitidos para realizar solicitudes
+    # Puedes utilizar '*' para permitir todos los dominios, pero esto no es recomendado en producción
+    # 'http://example.com',
+    # 'https://example.com',
+    'http://localhost:8000',
+    # '*'
+]
+
+CORS_ALLOW_ALL_ORIGINS = True  # Establece esto en True si deseas permitir todos los dominios
+
+CORS_ALLOW_CREDENTIALS = True  # Establece esto en True si deseas permitir el envío de cookies en las solicitudes
+
+CORS_ALLOWED_METHODS = [
+    'GET',
+    'POST',
+    'PUT',
+    'DELETE',
+]
+
+# AWS_ACCESS_KEY_ID = config('AWS_KEY_ID')
+# AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_KEY')
+# AWS_STORAGE_BUCKET_NAME = config('AWS_BUCKET_NAME')
+# AWS_S3_SIGNATURE_NAME = config('AWS_SIGNATURE_NAME')
+# AWS_S3_REGION_NAME = config('AWS_REGION_NAME')
+# AWS_S3_FILE_OVERWRITE = False
+# AWS_DEFAULT_ACL =  None
+# AWS_S3_VERIFY = True
+# DEFAULT_FILE_STORAGE = 'storages.backends.s3.S3Storage'
+
+
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+        },
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
+# STATICFILES_STORAGE = "storages.backends.s3.S3Storage"
+
+TEMPLATE_DIR = os.path.join(BASE_DIR,"templates")
+
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        #  Add  templates folder here
+        'DIRS': [BASE_DIR / 'templates'],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
