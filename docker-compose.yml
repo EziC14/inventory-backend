@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  web:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/usr/src/app
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    network_mode: "host"
+    command: python manage.py runserver 0.0.0.0:8765

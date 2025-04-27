@@ -1,0 +1,160 @@
+{% autoescape off %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificación de Cuenta INKA</title>
+    <style>
+        :root {
+            --primary-color: #342f78;
+            --secondary-color: #e8dfdb;
+            --text-color: #4A4A4A;
+            --heading-color: #2D2D2D;
+            --background-color: #F5F5F5;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--background-color);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+            color: var(--text-color);
+        }
+
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #FFFFFF;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            background-color: var(--primary-color);
+            padding: 30px 20px;
+            text-align: center;
+        }
+
+        .header img {
+            max-width: 150px;
+            height: auto;
+        }
+
+        .content {
+            padding: 40px 30px;
+        }
+
+        h1 {
+            color: var(--heading-color);
+            font-size: 24px;
+            margin: 0 0 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .welcome-text {
+            font-size: 18px;
+            margin-bottom: 25px;
+            color: var(--heading-color);
+        }
+
+        .verification-code-container {
+            background-color: var(--secondary-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 30px 0;
+            text-align: center;
+        }
+
+        .verification-code {
+            font-size: 32px;
+            letter-spacing: 4px;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin: 10px 0;
+            font-family: monospace;
+        }
+
+        .instructions {
+            background-color: #F8F9FA;
+            border-left: 4px solid var(--primary-color);
+            padding: 15px;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+
+        .footer {
+            background-color: #F8F9FA;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            border-top: 1px solid #E9ECEF;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: var(--primary-color);
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 500;
+            margin: 20px 0;
+        }
+
+        @media only screen and (max-width: 480px) {
+            .content {
+                padding: 20px 15px;
+            }
+
+            h1 {
+                font-size: 20px;
+            }
+
+            .verification-code {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+
+        </div>
+        
+        <div class="content">
+            <h1>Verificación de Cuenta</h1>
+            
+            <p class="welcome-text">
+                ¡Hola {{ user }}!
+            </p>
+
+            <p>
+                Gracias por registrarte en INKA. Para completar tu registro y activar tu cuenta, por favor utiliza el siguiente código de verificación:
+            </p>
+
+            <div class="verification-code-container">
+                <div class="verification-code">{{ random_number }}</div>
+                <p>Este código expirará en 10 minutos</p>
+            </div>
+
+            <p>
+                Si no has creado una cuenta en Bross, puedes ignorar este mensaje.
+            </p>
+        </div>
+
+        <div class="footer">
+            <p>
+                Este es un correo electrónico automático, por favor no respondas a este mensaje.<br>
+                © 2025 Bross. Todos los derechos reservados.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+{% endautoescape %}

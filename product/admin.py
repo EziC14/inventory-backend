@@ -9,39 +9,39 @@ from security.admin import default_fields
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'description') + default_list_display
+    list_display = ('id', 'name') + default_list_display
     list_filter = ('name', ) + default_list_filter
-    search_fields = ('name', 'description')
+    search_fields = ('name',)
     readonly_fields = ('id',) + default_readonly_fields
     fieldsets = (
         ('Información Básica', {
-            'fields': ('name', 'description'),
+            'fields': ('name',),
         }),
         default_fields
     )
 
 @admin.register(PrimaryProduct)
 class PrimaryProductAdmin(admin.ModelAdmin):
-    list_display = ('id', 'code', 'name', 'description', 'category', 'unit_cost') + default_list_display
+    list_display = ('id', 'code', 'name', 'has_colors','category', 'unit_cost') + default_list_display
     list_filter = ('category',) + default_list_filter
-    search_fields = ('code', 'name', 'description')
+    search_fields = ('code', 'name')
     readonly_fields = ('id',) + default_readonly_fields
     fieldsets = (
         ('Información Básica', {
-            'fields': ('code', 'name', 'description', 'category', 'unit_cost'),
+            'fields': ('code', 'name', 'has_colors', 'category', 'unit_cost'),
         }),
         default_fields
     )
 
 @admin.register(FinalProduct)
 class FinalProductAdmin(admin.ModelAdmin):
-    list_display = ('id', 'code', 'name', 'description', 'category', 'total_cost') + default_list_display
+    list_display = ('id', 'code', 'name', 'has_colors','category', 'total_cost') + default_list_display
     list_filter = ('category',) + default_list_filter
-    search_fields = ('code', 'name', 'description')
+    search_fields = ('code', 'name')
     readonly_fields = ('id',) + default_readonly_fields
     fieldsets = (
         ('Información Básica', {
-            'fields': ('code', 'name', 'description', 'category', 'total_cost'),
+            'fields': ('code', 'name', 'category','has_colors', 'total_cost'),
         }),
         default_fields
     )

@@ -29,6 +29,20 @@ class PrimaryProduct(Updater):
     def __str__(self):
         return self.name
     
+    def get_total_stock(self):
+        return sum([color.stock for color in self.colors.all()])
+    
+    def get_colors(self):
+        return [
+            {
+                'id': color.id,
+                'name': color.color,
+                'hex': color.hex_code,
+                'stock': color.stock,
+            }
+            for color in self.colors.all()
+        ]
+    
     class Meta:
         db_table            = "primary_product"
         verbose_name        = "Producto Primario"
@@ -45,6 +59,31 @@ class FinalProduct(Updater):
 
     def __str__(self):
         return self.name
+    
+    def get_total_stock(self):
+        return sum([color.stock for color in self.colors.all()])
+    
+    def get_compositions(self):
+        return [
+            {
+                'id': composition.primary_product.id,
+                'name': composition.primary_product.name,
+                'category': composition.primary_product.category.name,
+                'quantity': composition.quantity,
+            }
+            for composition in self.compositions.all()
+        ]
+    
+    def get_colors(self):
+        return [
+            {
+                'id': color.id,
+                'name': color.color,
+                'hex': color.hex_code,
+                'stock': color.stock,
+            }
+            for color in self.colors.all()
+        ]
     
     class Meta:
         db_table            = "final_product"
@@ -80,3 +119,4 @@ class FinalProductComposition(Updater):
         db_table            = "final_product_composition"
         verbose_name        = "Composición de Producto Final"
         verbose_name_plural = "Composiciones de Productos Finales"
+
