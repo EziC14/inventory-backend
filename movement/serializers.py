@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import InventoryMovement, InventoryMovementDetail, ReasonType
+from .models import InventoryMovement, InventoryMovementDetail
 
 class InventoryMovementDetailSerializer(serializers.ModelSerializer):
     class Meta:

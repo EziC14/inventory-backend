@@ -9,6 +9,7 @@ class Supplier(Updater):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, verbose_name="ID")
     contact_name = models.CharField(max_length=100, blank=True, null=True, verbose_name="Nombre de Contacto")
     company_name = models.CharField(max_length=150, blank=True, null=True, verbose_name="Nombre de la Empresa")
+    ruc = models.CharField(max_length=20, blank=True, null=True, verbose_name="RUC", unique=True)
     phone = models.CharField(max_length=20, blank=True, null=True, verbose_name="Teléfono")
     email = models.EmailField(blank=True, null=True, verbose_name="Correo Electrónico")
     address = models.TextField(blank=True, null=True, verbose_name="Dirección")

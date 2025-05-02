@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from django.db import transaction
+from django.shortcuts import get_object_or_404
 
 # Create your views here.
 class GetPostCategory(APIView):
@@ -72,6 +73,92 @@ class GetPostCategory(APIView):
                 {
                     'status': 'ERROR',
                     'msg': 'Ocurrió un error al crear la categoría',
+                    'detail': str(e),
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+class GetPutDeleteCategory(APIView):
+    permission_classes = [AllowAny]
+    def get(self, request, category_id):
+        try:
+            category = get_object_or_404(Category, id=category_id)
+
+            category_data = {
+                'id': category.id,
+                'name': category.name,
+                'description': category.description,
+            }
+
+            return Response(
+                {
+                    'status': 'OK',
+                    'msg': 'Detalle de la categoría',
+                    'data': category_data
+                },
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response(
+                {
+                    'status': 'ERROR',
+                    'msg': 'Ocurrió un error al obtener la categoría',
+                    'detail': str(e),
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    def put(self, request, category_id):
+        try:
+            name = request.data.get('name')
+            description = request.data.get('description')
+
+            if not name:
+                return Response(
+                    {
+                        'status': 'ERROR',
+                        'msg': 'Falta el nombre de la categoría',
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            category = get_object_or_404(Category, id=category_id)
+            category.name = name
+            category.description = description
+            category.save()
+
+            return Response(
+                {
+                    'status': 'OK',
+                    'msg': 'Categoría actualizada',
+                },
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response(
+                {
+                    'status': 'ERROR',
+                    'msg': 'Ocurrió un error al actualizar la categoría',
+                    'detail': str(e),
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    def delete(self, request, category_id):
+        try:
+            category = get_object_or_404(Category, id=category_id)
+            category.delete()
+
+            return Response(
+                {
+                    'status': 'OK',
+                    'msg': 'Categoría eliminada',
+                },
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response(
+                {
+                    'status': 'ERROR',
+                    'msg': 'Ocurrió un error al eliminar la categoría',
                     'detail': str(e),
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -673,4 +760,39 @@ class GetProductDetail(APIView):
                 {'status': 'ERROR', 'msg': 'Ocurrió un error al actualizar el producto.', 'detail': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-        
+
+class ProductColorListView(APIView):
+    """
+    Endpoint para obtener los colores disponibles de un producto primario.
+    Método: GET
+    URL: /api/product-colors/<primary_product_id>/
+    Respuesta: Lista de colores con id, color y hex_code.
+    """
+    def get(self, request, primary_product_id):
+        try:
+            # Validar que el producto primario exista
+            primary_product = get_object_or_404(PrimaryProduct, id=primary_product_id)
+
+            # Obtener los colores asociados al producto primario
+            colors = ProductColor.objects.filter(primary_product=primary_product).values(
+                'id', 'color', 'hex_code'
+            )
+
+            # Preparar la respuesta
+            response_data = {
+                'status': 'OK',
+                'msg': 'Lista de colores obtenida exitosamente',
+                'data': list(colors)
+            }
+
+            return Response(response_data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {
+                    'status': 'ERROR',
+                    'msg': f'Error al obtener los colores: {str(e)}',
+                    'data': None
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )       

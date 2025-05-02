@@ -15,7 +15,7 @@ class SupplierAdmin(admin.ModelAdmin):
     readonly_fields = ('id',) + default_readonly_fields
     fieldsets = (
         ('Información Básica', {
-            'fields': ('contact_name', 'company_name', 'phone', 'email'),
+            'fields': ('contact_name', 'company_name', 'phone', 'email', 'address', 'ruc'),
         }),
         default_fields
     )

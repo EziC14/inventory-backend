@@ -23,6 +23,7 @@ class SupplierView(APIView):
                 "phone": supplier.phone,
                 "email": supplier.email,
                 "address": supplier.address,
+                "ruc": supplier.ruc,
                 "products": []  # Lista para almacenar los productos del proveedor
             }
             
@@ -51,7 +52,8 @@ class SupplierView(APIView):
             company_name=data.get("company_name"),
             phone=data.get("phone"),
             email=data.get("email"),
-            address=data.get("address")
+            address=data.get("address"),
+            ruc=data.get("ruc"),
         )
         
         # Asociar productos primarios si se proporcionan
@@ -79,6 +81,7 @@ class SupplierDetailView(APIView):
                 "phone": supplier.phone,
                 "email": supplier.email,
                 "address": supplier.address,
+                "ruc": supplier.ruc,
                 "products": []  # Lista para almacenar los productos del proveedor
             }
             
@@ -105,6 +108,7 @@ class SupplierDetailView(APIView):
             supplier.phone = data.get("phone", supplier.phone)
             supplier.email = data.get("email", supplier.email)
             supplier.address = data.get("address", supplier.address)
+            supplier.ruc = data.get("ruc", supplier.ruc)
             
             supplier.save()
             
