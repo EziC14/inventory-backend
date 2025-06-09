@@ -23,7 +23,7 @@ class ReasonType(Updater):
 
 class InventoryMovement(Updater):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    direction = models.CharField(max_length=10, choices=[('input', 'Entrada'), ('output', 'Salida')], verbose_name="Dirección")
+    direction = models.CharField(max_length=10, choices=[('IN', 'Entrada'), ('OUT', 'Salida')], verbose_name="Dirección")
     reason_type = models.ForeignKey(ReasonType, on_delete=models.PROTECT, related_name='movements', verbose_name="Motivo del Movimiento")
     supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Proveedor")
     client_name = models.CharField(max_length=100, blank=True, null=True, verbose_name="Nombre del Cliente")
@@ -49,16 +49,16 @@ class InventoryMovementDetail(models.Model):
     total_price = models.DecimalField(max_digits=10, decimal_places=2, editable=False)
 
     def save(self, *args, **kwargs):
-        if self.movement.direction == 'output' and self.product_color:
+        if self.movement.direction == 'OUT' and self.product_color:
             if self.product_color.stock < self.quantity:
                 raise ValidationError(f"No hay suficiente stock para {self.product_color.color}. Stock disponible: {self.product_color.stock}")
 
         self.total_price = self.quantity * self.unit_price
 
         if self.product_color:
-            if self.movement.direction == 'input':
+            if self.movement.direction == 'IN':
                 self.product_color.stock += self.quantity
-            elif self.movement.direction == 'output':
+            elif self.movement.direction == 'OUT':
                 self.product_color.stock -= self.quantity
             self.product_color.save()
 
@@ -66,9 +66,9 @@ class InventoryMovementDetail(models.Model):
 
     def delete(self, *args, **kwargs):
         if self.product_color:
-            if self.movement.direction == 'input':
+            if self.movement.direction == 'IN':
                 self.product_color.stock -= self.quantity
-            elif self.movement.direction == 'output':
+            elif self.movement.direction == 'OUT':
                 self.product_color.stock += self.quantity
             self.product_color.save()
 

@@ -1,11 +1,22 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from product.models import PrimaryProduct, ProductColor
 from .models import InventoryMovement, InventoryMovementDetail, ReasonType
 from django.db import transaction
 import uuid
+import os
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
+from rest_framework.parsers import MultiPartParser, FormParser
+from utils.gemini import analizar_documento_con_gemini
+import json
+from rest_framework.permissions import AllowAny
+import re
+from supplier.models import Supplier
+from product.models import FinalProduct
 
 # Create your views here.
 
@@ -144,6 +155,11 @@ class InventoryMovementListCreateView(APIView):
                 product_color_id = detail.get('product_color')
                 if product_color_id:
                     product_color = get_object_or_404(ProductColor, id=product_color_id)
+                    
+                    # Verificar stock disponible para salidas antes de crear el detalle
+                    if movement.direction == 'output' and detail_data['quantity'] > product_color.stock:
+                        raise ValidationError(f"No hay suficiente stock para {product_color.color}. Stock disponible: {product_color.stock}")
+                    
                     detail_data['product_color'] = product_color
 
                 # Crear el detalle (el stock se actualiza en el método save)
@@ -170,7 +186,8 @@ class InventoryMovementListCreateView(APIView):
                     detail_response['product_color'] = {
                         'id': detail_obj.product_color.id,
                         'name': detail_obj.product_color.color,
-                        'hex_code': detail_obj.product_color.hex_code
+                        'hex_code': detail_obj.product_color.hex_code,
+                        'stock_actual': detail_obj.product_color.stock  # Añadido para mostrar el stock actualizado
                     }
 
                 details_data.append(detail_response)
@@ -205,10 +222,16 @@ class InventoryMovementListCreateView(APIView):
 
             return Response({
                 'status': 'OK',
-                'msg': 'Movimiento de inventario creado exitosamente',
+                'msg': f"Movimiento de inventario {'ENTRADA' if movement.direction == 'input' else 'SALIDA'} creado exitosamente",
                 'data': response_data
             }, status=status.HTTP_201_CREATED)
 
+        except ValidationError as ve:
+            return Response({
+                'status': 'ERROR',
+                'msg': f'Validación fallida: {str(ve)}',
+                'data': None
+            }, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({
                 'status': 'ERROR',
@@ -451,8 +474,9 @@ class InventoryMovementDetailView(APIView):
     @transaction.atomic
     def delete(self, request, id):
         try:
+            print(f"Eliminando movimiento con ID: {id}")
             movement = get_object_or_404(InventoryMovement, id=id)
-
+            print(f"Movimiento encontrado: {movement}")
             # Eliminar el movimiento (la reversión del stock se maneja en delete() de los detalles)
             movement.delete()
 
@@ -526,3 +550,206 @@ class ReasonTypeDetailView(APIView):
             return Response({'status': 'OK', 'msg': 'Tipo de Movimiento actualizado', 'data': str(reason_type.id)}, status=status.HTTP_200_OK)
         except ReasonType.DoesNotExist:
             return Response({'status': 'ERROR', 'msg': 'Tipo de Movimiento no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+        
+class DocumentAnalyzerAPIView(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        try:
+
+            if 'file' not in request.FILES:
+                return Response(
+                    {"error": "No file provided. Please upload a PDF or image file."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Obtener el archivo y su extensión
+            file_obj = request.FILES['file']
+            file_extension = os.path.splitext(file_obj.name)[1].lower()
+
+            # Validar las extensiones permitidas
+            allowed_extensions = ['.pdf', '.jpg', '.jpeg', '.png']
+            if file_extension not in allowed_extensions:
+                return Response(
+                    {"error": f"Unsupported file format. Only {', '.join(allowed_extensions)} are allowed."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Llamar a la función que analiza el documento con Gemini
+            response = analizar_documento_con_gemini(file_obj, file_extension)
+
+            # Limpiar el texto de posibles bloques de código en la respuesta
+            clean_text = re.sub(r"^```json|```$", "", response.text.strip(), flags=re.MULTILINE).strip()
+
+            # Intentar parsear el JSON limpio
+            try:
+                result = json.loads(clean_text)
+                print(result)  # Imprimir el resultado para depuración
+                # Verificar si el resultado es un diccionario
+                if isinstance(result, dict):
+                    # Transformar el resultado a datos de movimiento de inventario
+                    inventory_data = self.transform_to_inventory_data(result)
+                    return Response(inventory_data, status=status.HTTP_200_OK)
+                
+                else:
+                    return Response({"error": "Invalid JSON structure."}, status=status.HTTP_400_BAD_REQUEST)
+            except json.JSONDecodeError:
+                result = {"raw_response": response.text}  # Si no es JSON válido, devolver la respuesta cruda
+
+            return Response(result, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def transform_to_inventory_data(self, gemini_result):
+        """
+        Transform the Gemini AI result into a format suitable for inventory movement
+        """
+        import uuid
+        # Basic validation
+        if not isinstance(gemini_result, dict):
+            return {"error": "Invalid document structure"}
+        
+        # Extract data from gemini_result
+        proveedor_ruc = gemini_result.get('ProveedorRUC')
+        fecha_pedido = gemini_result.get('FechaDePedido')
+        cliente_nombre = gemini_result.get('NombreCliente')
+        detalles_pedido = gemini_result.get('DetallesPedido', [])
+        
+        # Crear una lista de nombres de productos para incluir en las notas
+        nombres_productos = []
+        for detalle in detalles_pedido:
+            if detalle.get('NombreProducto'):
+                # Limpiar el nombre del producto (eliminar saltos de línea)
+                nombre_limpio = detalle.get('NombreProducto').replace('\n', ' ').strip()
+                nombres_productos.append(nombre_limpio)
+        
+        # Crear la nota con los nombres de productos
+        lista_productos = ", ".join(nombres_productos)
+        nota_completa = f"Pedido automático procesado del {fecha_pedido}, {lista_productos}"
+        
+        # Initialize inventory movement data with exact format
+        inventory_data = {
+            "direction": "IN",  # Assuming this is an incoming movement
+            "notes": nota_completa,
+            "total_price": 0,
+            "client_name":  cliente_nombre if cliente_nombre else None,
+            "supplier": None,
+            "reason_type": [],
+            "details": []
+        }
+        
+        # Look up supplier by RUC
+        if proveedor_ruc:
+            try:
+                supplier = Supplier.objects.filter(ruc=proveedor_ruc).first()
+                if supplier:
+                    inventory_data["supplier"] = {
+                        "id": supplier.id,
+                        "name": supplier.company_name
+                    }
+            except Exception as e:
+                print(f"Error finding supplier: {str(e)}")
+        
+        # Process each product detail
+        total_price = 0
+        for detail in detalles_pedido:
+            codigo = detail.get('Codigo')
+            nombre_producto = detail.get('NombreProducto')
+            precio_unitario = detail.get('PrecioUnitario')
+            cantidad = detail.get('Cantidad')
+            monto_total = detail.get('MontoTotal')
+            
+            # Skip if essential data is missing
+            if not (precio_unitario and cantidad):
+                continue
+            
+            # Calculate item total price if not provided
+            if not monto_total and precio_unitario and cantidad:
+                monto_total = float(precio_unitario) * float(cantidad)
+            
+            # Add to total price
+            if monto_total:
+                total_price += float(monto_total)
+            
+            # Create detail item with exact format
+            detail_item = {
+                "quantity": cantidad,
+                "unit_price": precio_unitario,
+                "total_price": monto_total,
+                "primary_product": None,
+                "product_color": None
+            }
+            
+            # Look up primary product by code or name
+            primary_product = None
+            try:
+                # Try to find primary product by code first
+                if codigo:
+                    # quitar el primer dijito de mi codigo
+                    codigo = codigo[1:]
+                    primary_product = PrimaryProduct.objects.filter(code=codigo).first()
+                
+                # If not found by code, try matching by name
+                if not primary_product and nombre_producto:
+                    # First try exact match
+                    primary_product = PrimaryProduct.objects.filter(
+                        name__iexact=nombre_producto
+                    ).first()
+                    
+                    # If still not found, try partial match
+                    if not primary_product:
+                        words = nombre_producto.split()
+                        for word in words:
+                            if len(word) > 3:  # Skip very short words
+                                primary_product = PrimaryProduct.objects.filter(
+                                    name__icontains=word
+                                ).first()
+                                if primary_product:
+                                    break
+            except Exception as e:
+                print(f"Error finding primary product: {str(e)}")
+            
+            # Add primary product info if found
+            if primary_product:
+                detail_item["primary_product"] = {
+                    "id": primary_product.id,
+                    "name": primary_product.name
+                }
+                
+                try:
+                    # Buscar solo el color NEUTRO para este producto
+                    color_object = ProductColor.objects.filter(
+                        primary_product=primary_product, 
+                        color__iexact="Neutro"
+                    ).first()
+                    
+                    print(f"Color object: {color_object}")
+                    # Add color info if found
+                    if color_object:
+                        detail_item["product_color"] = {
+                            "id": color_object.id,
+                            "name": color_object.color,
+                            "hex_code": color_object.hex_code
+                        }
+                except Exception as e:
+                    print(f"Error finding NEUTRO color: {str(e)}")
+            
+            inventory_data["details"].append(detail_item)
+        
+        inventory_data["total_price"] = total_price
+        
+        for detail in inventory_data["details"]:
+            detail["id"] = str(uuid.uuid4())
+        
+        inventory_data["id"] = str(uuid.uuid4())
+        inventory_data["direction_display"] = inventory_data["direction"]
+
+        response_data = {
+            'status': 'OK',
+            'msg': 'Documento procesado exitosamente',
+            'data': inventory_data
+        }
+        
+        return response_data

@@ -66,7 +66,7 @@ class SupplierView(APIView):
             'msg': 'Proveedor creado correctamente',
             'data': {
                 'id': supplier.id,
-                'name': supplier.name
+                'name': supplier.company_name
             }
         }, status=status.HTTP_201_CREATED)
     

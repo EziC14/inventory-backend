@@ -2,38 +2,34 @@ import google.generativeai as genai
 from PIL import Image
 import PyPDF2
 from decouple import config
+import io
 
 API_KEY = config('API_KEY_GEMINI')
 genai.configure(api_key=API_KEY)
 
-def cargar_imagen_o_pdf(ruta):
-    if ruta.endswith('.pdf'):
-        # Si el archivo es un PDF, lo extraemos como texto
-        with open(ruta, 'rb') as file:
-            reader = PyPDF2.PdfReader(file)
-            text = ""
-            for page in reader.pages:
-                text += page.extract_text()
+def cargar_imagen_o_pdf(file_obj, extension):
+    if extension == '.pdf':
+        reader = PyPDF2.PdfReader(file_obj)
+        text = ''
+        for page in reader.pages:
+            text += page.extract_text()
         return text
-    elif ruta.endswith(('.jpg', '.png', '.jpeg')):
-        # Si es una imagen, la abrimos con Pillow
-        imagen = Image.open(ruta)
-        return imagen
+    elif extension in ['.jpg', '.jpeg', '.png']:
+        image = Image.open(file_obj)
+        return image
     else:
-        raise ValueError("Solo se permiten archivos PDF o de imagen (JPG, PNG, JPEG)")
+        raise ValueError("Unsupported file format")
 
-# Enviar el archivo al modelo para su procesamiento
-def analizar_documento_con_gemini(ruta_archivo):
-    contenido = cargar_imagen_o_pdf(ruta_archivo)
+def analizar_documento_con_gemini(file_obj, extension):
+    contenido = cargar_imagen_o_pdf(file_obj, extension)
 
-    # Selecciona el modelo con capacidades de procesamiento de visión
-    model = genai.GenerativeModel('models/gemini-1.5-pro')
+    model = genai.GenerativeModel('models/gemini-2.0-flash')
 
-    # Define el prompt
     prompt = """
         Extract the following information from the provided document and output it in JSON format:
 
         {
+        "NombreCliente": "The name of the client/buyer",
         "ProveedorRUC": "The RUC number of the provider/seller",
         "FechaDePedido": "The date when the order/invoice was issued",
         "DetallesPedido": [
@@ -41,7 +37,7 @@ def analizar_documento_con_gemini(ruta_archivo):
             "Codigo": "Product code/article number",
             "NombreProducto": "Product name/description",
             "PrecioUnitario": "UNIT PRICE PER SINGLE ITEM (not total, not quantity)",
-            "Cantidad": "NUMBER OF ITEMS ordered/purchased",
+            "Cantidad": "NUMBER OF ITEMS ordered/purchased", (type number in integer)
             "MontoTotal": "Total amount for this line (PrecioUnitario * Cantidad)"
             }
         ]
@@ -56,20 +52,6 @@ def analizar_documento_con_gemini(ruta_archivo):
         Ensure the JSON is properly formatted and accurately reflects the document data.
     """
 
-    if isinstance(contenido, str):  # Si es un texto (PDF)
-        # Si es texto extraído de un PDF
-        response = model.generate_content([prompt, contenido])  # Pass both prompt and content
-    else:
-        # Si es una imagen, le pasamos la imagen para analizar
-        response = model.generate_content([prompt, contenido]) # Passboth prompt and image
-
+    response = model.generate_content([prompt, contenido])
+    
     return response
-
-ruta_archivo = '20424729052-01-F001-0023319.pdf'  # Cambia el archivo aquí
-
-# Llamar a la función para analizar el archivo
-response = analizar_documento_con_gemini(ruta_archivo)
-
-# Imprimir la respuesta
-print("Respuesta del modelo:")
-print(response.text)
